@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import postgres from 'postgres';
 import { signIn } from '@/auth';
 import { AuthError } from 'next-auth';
+import bcrypt from 'bcrypt';
 
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
@@ -120,4 +121,60 @@ export async function authenticate(
     }
     throw error;
   }
+}
+
+const SignUpFormSchema = z.object({
+  name: z.string().min(1, 'Name cannot be empty'),
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  confirmPassword: z.string().min(6, 'Confirm password must be at least 6 characters'),
+});
+
+
+export async function signUp(prevState: string | undefined, formData: FormData) {
+  const validatedFields = SignUpFormSchema.safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+    password: formData.get('password'),
+    confirmPassword: formData.get('confirmPassword'),
+  });
+
+  if (!validatedFields.success) {
+    return 'Please check if the form information is filled in correctly';
+  }
+
+  const { name, email, password, confirmPassword } = validatedFields.data;
+
+  // Check if the passwords match
+  if (password !== confirmPassword) {
+    return 'The two passwords entered do not match';
+  }
+
+  try {
+    // Check if the user already exists
+    const existingUser = await sql`
+      SELECT id FROM users WHERE email = ${email}
+    `;
+
+    if (existingUser.length > 0) {
+      return 'This email has already been registered';
+    }
+
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create the user
+    await sql`
+      INSERT INTO users (name, email, password)
+      VALUES (${name}, ${email}, ${hashedPassword})
+    `;
+
+    console.log('User registered successfully');
+  } catch (error) {
+    console.error('Registration failed:', error);
+    return 'Registration failed, please try again later';
+  }
+
+  // Redirect to the login page after successful registration
+  redirect('/login');
 }
