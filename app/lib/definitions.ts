@@ -14,6 +14,7 @@ export type Customer = {
   name: string;
   email: string;
   image_url: string;
+  user_id: string;
 };
 
 export type Invoice = {
@@ -24,11 +25,13 @@ export type Invoice = {
   // In TypeScript, this is called a string union type.
   // It means that the "status" property can only be one of the two strings: 'pending' or 'paid'.
   status: 'pending' | 'paid';
+  user_id: string;
 };
 
 export type Revenue = {
   month: string;
   revenue: number;
+  user_id: string;
 };
 
 export type LatestInvoice = {
