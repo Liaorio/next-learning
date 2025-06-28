@@ -7,6 +7,7 @@ import postgres from 'postgres';
 import { signIn } from '@/auth';
 import { AuthError } from 'next-auth';
 import bcrypt from 'bcrypt';
+import { getCurrentUserId } from './auth-utils';
 
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
@@ -55,12 +56,23 @@ export async function createInvoice(prevState: State, formData: FormData) {
   const { customerId, amount, status } = validatedFields.data;
   const amountInCents = amount * 100;
   const date = new Date().toISOString().split('T')[0];
+  
+  // Get user ID using the auth-utils hook
+  let userId: string;
+  try {
+    userId = await getCurrentUserId();
+  } catch (error) {
+    console.error(error);
+    return {
+      message: 'Not logged in or unable to retrieve user ID. Cannot create invoice.',
+    };
+  }
  
   // Insert data into the database
   try {
     await sql`
-      INSERT INTO invoices (customer_id, amount, status, date)
-      VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
+      INSERT INTO invoices (customer_id, amount, status, date, user_id)
+      VALUES (${customerId}, ${amountInCents}, ${status}, ${date}, ${userId})
     `;
   } catch (error) {
       // If a database error occurs, return a more specific error.
@@ -177,4 +189,58 @@ export async function signUp(prevState: string | undefined, formData: FormData) 
 
   // Redirect to the login page after successful registration
   redirect('/login');
+}
+
+const CreateCustomerSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().email('Please enter a valid email'),
+  image_url: z.string().url('Please enter a valid avatar URL'),
+});
+
+type CustomerState = {
+  errors?: {
+    name?: string[];
+    email?: string[];
+    image_url?: string[];
+  };
+  message?: string | null;
+};
+
+export async function createCustomer(prevState: CustomerState, formData: FormData) {
+  const validatedFields = CreateCustomerSchema.safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+    image_url: formData.get('image_url'),
+  });
+
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: 'Form validation failed. Could not add customer.',
+    };
+  }
+
+  const { name, email, image_url } = validatedFields.data;
+  
+  // Get user ID using the auth-utils hook
+  let userId: string;
+  try {
+    userId = await getCurrentUserId();
+  } catch (error) {
+    console.error(error);
+    return { message: 'Not logged in or unable to retrieve user ID. Cannot add customer.' };
+  }
+
+  try {
+    await sql`
+      INSERT INTO customers (name, email, image_url, user_id)
+      VALUES (${name}, ${email}, ${image_url}, ${userId})
+    `;
+  } catch (error) {
+    console.error('Failed to add customer:', error);
+    return { message: 'Database error. Failed to add customer.' };
+  }
+
+  revalidatePath('/dashboard/customers');
+  redirect('/dashboard/customers');
 }

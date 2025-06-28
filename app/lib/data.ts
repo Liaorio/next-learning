@@ -8,14 +8,12 @@ import {
   Revenue,
 } from './definitions';
 import { formatCurrency } from './utils';
-import { auth } from '@/auth';
+import { getCurrentUserId } from './auth-utils';
 
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
 export async function fetchRevenue() {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) throw new Error('Not logged in or session has no userId');
+  const userId = await getCurrentUserId();
   try {
     const data = await sql<Revenue[]>`SELECT * FROM revenue WHERE user_id = ${userId}`;
     return data;
@@ -26,9 +24,7 @@ export async function fetchRevenue() {
 }
 
 export async function fetchLatestInvoices() {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) throw new Error('Not logged in or session has no userId');
+  const userId = await getCurrentUserId();
   try {
     const data = await sql<LatestInvoiceRaw[]>`
       SELECT invoices.amount, customers.name, customers.image_url, customers.email, invoices.id
@@ -50,9 +46,7 @@ export async function fetchLatestInvoices() {
 }
 
 export async function fetchCardData() {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) throw new Error('Not logged in or session has no userId');
+  const userId = await getCurrentUserId();
   try {
     const invoiceCountPromise = sql`SELECT COUNT(*) FROM invoices WHERE user_id = ${userId}`;
     const customerCountPromise = sql`SELECT COUNT(*) FROM customers WHERE user_id = ${userId}`;
@@ -90,9 +84,7 @@ export async function fetchFilteredInvoices(
   currentPage: number,
 ) {
   const offset = (currentPage - 1) * ITEMS_PER_PAGE;
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) throw new Error('Not logged in or session has no userId');
+  const userId = await getCurrentUserId();
   try {
     const invoices = await sql<InvoicesTable[]>`
       SELECT
@@ -124,9 +116,7 @@ export async function fetchFilteredInvoices(
 }
 
 export async function fetchInvoicesPages(query: string) {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) throw new Error('Not logged in or session has no userId');
+  const userId = await getCurrentUserId();
   try {
     const data = await sql`SELECT COUNT(*)
     FROM invoices
@@ -149,9 +139,7 @@ export async function fetchInvoicesPages(query: string) {
 }
 
 export async function fetchInvoiceById(id: string) {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) throw new Error('Not logged in or session has no userId');
+  const userId = await getCurrentUserId();
   try {
     const data = await sql<InvoiceForm[]>`
       SELECT
@@ -177,9 +165,7 @@ export async function fetchInvoiceById(id: string) {
 }
 
 export async function fetchCustomers() {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) throw new Error('Not logged in or session has no userId');
+  const userId = await getCurrentUserId();
   try {
     const customers = await sql<CustomerField[]>`
       SELECT
@@ -198,9 +184,7 @@ export async function fetchCustomers() {
 }
 
 export async function fetchFilteredCustomers(query: string) {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) throw new Error('Not logged in or session has no userId');
+  const userId = await getCurrentUserId();
   try {
     const data = await sql<CustomersTableType[]>`
 		SELECT
