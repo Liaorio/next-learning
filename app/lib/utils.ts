@@ -1,5 +1,3 @@
-import { Revenue } from './definitions';
-
 export const formatCurrency = (amount: number) => {
   return (amount / 100).toLocaleString('en-US', {
     style: 'currency',
@@ -21,17 +19,16 @@ export const formatDateToLocal = (
   return formatter.format(date);
 };
 
-export const generateYAxis = (revenue: Revenue[]) => {
-  // Calculate what labels we need to display on the y-axis
-  // based on highest record and in 1000s
+export const generateYAxis = (revenue: {month: string, revenue: number, user_id: string}[]) => {
+  // 只显示最多5个y轴标签，分布均匀，单位为美元整数
   const yAxisLabels = [];
   const highestRecord = Math.max(...revenue.map((month) => month.revenue));
   const topLabel = Math.ceil(highestRecord / 1000) * 1000;
-
-  for (let i = topLabel; i >= 0; i -= 1000) {
-    yAxisLabels.push(`$${i / 1000}K`);
+  const labelCount = 5;
+  for (let i = 0; i < labelCount; i++) {
+    const value = Math.round(topLabel - (topLabel / (labelCount - 1)) * i);
+    yAxisLabels.push(`$${value}`);
   }
-
   return { yAxisLabels, topLabel };
 };
 
@@ -67,3 +64,30 @@ export const generatePagination = (currentPage: number, totalPages: number) => {
     totalPages,
   ];
 };
+
+/**
+ * 处理原始SQL结果，补全近12个月的月份，转换为英文缩写，金额转为美元
+ */
+export function getLast12MonthsRevenue(
+  rawData: { month: string; revenue: number }[],
+  userId: string
+): {month: string, revenue: number, user_id: string}[] {
+  const now = new Date();
+  const months: { key: string; label: string }[] = [];
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = d.toISOString().slice(0, 7);
+    const label = monthNames[d.getMonth()];
+    months.push({ key, label });
+  }
+  const revenueMap = new Map(rawData.map((item) => [item.month, item]));
+  return months.map(({ key, label }) => {
+    const item = revenueMap.get(key);
+    return {
+      month: label,
+      revenue: item ? Number(item.revenue) / 100 : 0, // 转为美元
+      user_id: userId,
+    };
+  });
+}

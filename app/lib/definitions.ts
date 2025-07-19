@@ -28,12 +28,6 @@ export type Invoice = {
   user_id: string;
 };
 
-export type Revenue = {
-  month: string;
-  revenue: number;
-  user_id: string;
-};
-
 export type LatestInvoice = {
   id: string;
   name: string;

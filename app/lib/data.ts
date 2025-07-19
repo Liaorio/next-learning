@@ -5,18 +5,28 @@ import {
   InvoiceForm,
   InvoicesTable,
   LatestInvoiceRaw,
-  Revenue,
 } from './definitions';
 import { formatCurrency } from './utils';
 import { getCurrentUserId } from './auth-utils';
+import { getLast12MonthsRevenue } from './utils';
 
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
 export async function fetchRevenue() {
   const userId = await getCurrentUserId();
   try {
-    const data = await sql<Revenue[]>`SELECT * FROM revenue WHERE user_id = ${userId}`;
-    return data;
+    // 查询近12个月每月的已收款总额
+    const data = await sql<{month: string, revenue: number}[]>`
+      SELECT
+        to_char(date_trunc('month', date), 'YYYY-MM') AS month,
+        COALESCE(SUM(amount), 0) AS revenue
+      FROM invoices
+      WHERE user_id = ${userId} AND status = 'paid' AND date >= (CURRENT_DATE - INTERVAL '12 months')
+      GROUP BY month
+      ORDER BY month ASC
+    `;
+    // 使用工具函数处理
+    return getLast12MonthsRevenue(data, userId);
   } catch (error) {
     console.error('Database Error:', error);
     throw new Error('Failed to fetch revenue data.');
